@@ -1,34 +1,53 @@
 from package import Package
+from code_file import CodeFile
 from langugageLookup import language_data
 from langugageLookup import llm_data
+from pathlib import Path
+from method import Method
 
 
 def fill_out_prompts(packages: list[Package], ext: str):
 
     for package in packages:
-        for filepath in package.source_code.keys():
-            template_values = gather_template_values(ext, package, filepath)
+        for file, code_file in package.source_code.items():
+            for method in code_file.methods:
 
-            populate_template(filepath, package, template_values)
+                template_values = gather_template_values(
+                    ext, package, code_file, method)
+                populate_template(template_values)
 
-        pass
 
-
-def gather_template_values(language: str, package: Package, filepath: str) -> dict:
+def gather_template_values(language: str, package: Package, code_file: CodeFile, method: Method) -> dict:
     template_data = {}
-    template_data["language"] = language
-    template_data["testing_framework"] = language_data[language]["testing_frameworks"][0]
-    template_data["source_code"] = package.source_code[filepath]
+    template_data['language'] = language
+    template_data['testing_framework'] = language_data[language]["testing_frameworks"][0]
+    if str(code_file.path.absolute()) in package.static_analysis_data:
+        template_data['static_code_analysis'] = package.static_analysis_data[str(
+            code_file.path.absolute())].violations
+    else:
+        template_data['static_code_analysis'] = ''
+    template_data['source_code'] = str(method)
+    template_data['code_imports'] = code_file.imports
+    template_data['notes'] = ''
+    template_data['code_comments'] = ''
+    # {overview} - Overview of the target project. Initially can be the top-level readme, and eventually could be a summary from the LLM
+    # {language} - Programming language the source code is in
+    # {testing_framework} - Framework used for testing
+    # {source_code} - Code that will be tested (can be any length, method, class, or more, if needed)
+    # {code_imports} - Specific imports for the source code file
+    # {code_comments} - Method and or class comments to provide context
+    # {static_code_analysis} - results for static code analysis
+    # {notes} - Any additional comments to add to the prompt
+
     return template_data
 
 
-def populate_template(filepath: str, package: Package, template_data: dict) -> str:
-    with open("template_prompts/singleprompt.txt", "r") as file:
-
+def populate_template(template_data: dict) -> str:
+    with open("template_prompts/methodprompt.txt", "r") as file:
         template = file.read()
-        template = template.format(programming_language=template_data["language"], testing_framework_tool=template_data[
-                                   "testing_framework"], source_code="", static_code_analysis_results="", src_file_name="")
-        # print(template)
+        template = template.format(**template_data)
+        if template_data['static_code_analysis']:
+            print(template)
 
 # Provide the values for the placeholders
 # values = {

@@ -1,0 +1,25 @@
+Generate line unit tests using the following criteria:
+- Test coverage for reasonable input, output, edge cases, and exceptions.
+- Include mocks where needed.
+- Tests should have clear, descriptive method names.
+- Test comments should be included when complexity warrants it.
+- Do not assume there are public getters and setters unless found in the source code
+- Imports in the source code do not indicate that the method being tested needs the dependency
+
+Language: {language}
+Testing Framework: {testing_framework}
+
+Code to be tested:
+{source_code}
+
+Code Imports:
+{code_imports}
+
+Code Comments:
+{code_comments}
+
+Static Code Analysis Comments:
+{static_code_analysis}
+
+Additional Notes:
+{notes}
