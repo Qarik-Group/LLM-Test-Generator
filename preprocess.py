@@ -270,7 +270,9 @@ def run_static_code_analysis(package: Path) -> dict:
             staticAnalysisData[file["filename"]] = StaticAnalysisData(
                 file["filename"], file["violations"])
     return staticAnalysisData
-    # All of this was pregenerated to save time
+    # This is needed, but is commented out since running this against the repository takes quite a bit of time.
+    # I have pregenerated the files, and they are being loaded above
+
     # command = [
     #     '/Users/jake/Applications/pmd-bin-7.0.0-rc2/bin/pmd', 'check',
     #     '-D', package.absolute(),
