@@ -1,10 +1,11 @@
 from code_file import CodeFile
-import json
+import os
 from method import Method
 from package import Package
 from pathlib import Path
 import re
 from static_analysis_data import StaticAnalysisData
+from static_code_analysis import analyze
 
 
 def preprocess(directory: Path, ext: str) -> list[Package]:
@@ -19,32 +20,53 @@ def preprocess(directory: Path, ext: str) -> list[Package]:
     """
     packages = []
     package_dirs: list[Path] = find_packages(directory)
-    for package in package_dirs:
+    analysis_data = analyze(directory)
+    i = 0
+    for package_dir in package_dirs:
 
-        source_file_paths = find_files(package, "main", ext)
-        test_file_paths = find_files(package, "test", ext)
+        source_file_paths = find_files(package_dir, "main", ext)
+        test_file_paths = find_files(package_dir, "test", ext)
         source_files = {}
         test_files = {}
-        analysis_data = run_static_code_analysis(package)
 
         for file in source_file_paths:
-            code: CodeFile = parse_file(file)
+            file_static_analysis = []
+
+            if str(file.absolute()) in analysis_data:
+                file_static_analysis = analysis_data[str(file.absolute())]
+            code: CodeFile = parse_file(file, file_static_analysis)
             if code is None:
                 continue
             source_files[str(file.absolute())] = code
-        for file in test_file_paths:
-            code: CodeFile = parse_file(file)
-            if code is None:
-                continue
-            test_files[str(file.absolute())] = code
-            print(code.imports)
+        # for file in test_file_paths:
+        #     code: CodeFile = parse_file(file)
+        #     if code is None:
+        #         continue
+        #     test_files[str(file.absolute())] = code
+        package = parse_package_value(source_file_paths[0])
 
-        packages.append(Package(package, source_files,
+        packages.append(Package(package, package_dir, source_files,
                         analysis_data, test_files))
     return packages
 
 
-def parse_file(file: Path) -> CodeFile:
+def parse_package_value(path: Path) -> str:
+    package_parts = []
+    path, _ = os.path.split(path)
+    while True:
+        path, folder = os.path.split(path)
+        if folder == 'java' or folder == 'src':
+            break
+        package_parts.append(folder)
+        if not path:
+            break
+    package_parts.reverse()
+    package_name = '.'.join(package_parts)
+
+    return str(package_name)
+
+
+def parse_file(file: Path, static_code_analysis: list[dict]) -> CodeFile:
     """Parses a java file for useful context information, including package, imports, class comments, and methods
 
     Args:
@@ -55,16 +77,93 @@ def parse_file(file: Path) -> CodeFile:
     """
     with open(file, "r") as input_file:
         java_code = input_file.read()
-        package = get_package(java_code)
-        imports = get_imports(java_code)
-        class_comments = get_class_comments(java_code.splitlines())
-        methods = get_methods(java_code)
+        package = parse_package(java_code)
+        class_signatures = parse_class(java_code)
+        class_signatures = get_signature_info(class_signatures)
+
+        imports = parse_imports(java_code)
+        class_comments = parse_class_comments(java_code.splitlines())
+        fields = parse_class_fields(java_code)
+        methods = parse_methods(java_code, class_signatures)
         if len(methods) == 0:
             return None
-        return CodeFile(class_comments, methods, file, package, imports)
+        return CodeFile(class_signatures, class_comments, fields, methods, file, package, imports, static_code_analysis)
 
 
-def get_package(code: str) -> str:
+def parse_class_fields(code: str) -> list[str]:
+    field_pattern = (
+        # Access modifiers
+        r'((?:public\s*|protected\s*|private\s*)*'
+        # modifiers
+        r'(?:abstract\s*|synchronized\s*|static\s*|final\s*|transient\s*|volatile\s*)*'
+        # Return type
+        r'(?:void|[A-Za-z0-9<>\[\]]+) '
+        # Variable name
+        r'(?:[A-Za-z0-9_]+)'
+        # Optional assignment value
+        r'(?:\s*=\s*[A-Za-z0-9" \.]*)*;)'
+    )
+    matches = re.findall(field_pattern, code)
+    fields = []
+    for field in matches:
+        fields.append(field)
+    return fields
+
+
+def get_signature_info(class_signatures: list[str]) -> list[str]:
+    signatures = []
+    for signature in class_signatures:
+        typ = ('class'if 'class' in signature else
+               'enum' if 'enum' in signature else 'interface')
+        extends_pattern = r'extends\s*([A-Za-z0-9<>]*)\s*'
+        implements_pattern = r'implements\s*([A-Za-z0-9<>]*)\s*'
+        name_pattern = (
+            # Name
+            r'((?:[A-Za-z0-9<>]*))\s*'
+            # Helps extract only the name
+            r'(?:extends\s*[A-Za-z0-9<>]*)*\s*'
+            # Helps extract only the name
+            r'(?:implements\s*[A-Za-z0-9<>]*)*\s*\{')
+        extends_matches = re.findall(extends_pattern, signature)
+        implements_matches = re.findall(implements_pattern, signature)
+        name_matches = re.findall(name_pattern, signature)
+        signatureInfo = {'signature': signature, 'type': typ}
+        if extends_matches:
+            signatureInfo['extends'] = extends_matches
+        if implements_matches:
+            signatureInfo['implements'] = implements_matches
+        if name_matches:
+            signatureInfo['name'] = name_matches[0]
+        signatures.append(signatureInfo)
+    return signatures
+
+
+def parse_class(code: str) -> list[str]:
+    """Retrieves the package string at the beginning of the file
+
+    Args:
+        code (str): the full text of a java code document
+
+    Returns:
+        str: The package declaration, may be empty string
+    """
+    class_pattern = (
+        # Access modifers
+        r"((?:public\s*|protected\s*|private\s*)*"
+        # class keywork and name
+        r"(?:class|enum|interface)\s*(?:[A-Za-z0-9<>]*)\s*"
+        # optional extends and name
+        r"(?:extends\s*[A-Za-z0-9<>]*)*\s*"
+        # optional implements and name
+        r"(?:implements\s*[A-Za-z0-9<>]*)*\s*\{)")
+    matches = re.findall(class_pattern, code)
+    classes = []
+    for cls in matches:
+        classes.append(cls)
+    return classes
+
+
+def parse_package(code: str) -> str:
     """Retrieves the package string at the beginning of the file
 
     Args:
@@ -80,7 +179,7 @@ def get_package(code: str) -> str:
     return ""
 
 
-def get_imports(code: str) -> list[str]:
+def parse_imports(code: str) -> list[str]:
     """Retrieves all the imports in a in a file
 
     Args:
@@ -97,7 +196,7 @@ def get_imports(code: str) -> list[str]:
     return imports
 
 
-def get_methods(code: str) -> list[Method]:
+def parse_methods(code: str, class_signatures: list[str]) -> list[Method]:
     """Retrieves all the methods in a file, parsing by method comments, method signatures, and method body
 
     Args:
@@ -111,7 +210,7 @@ def get_methods(code: str) -> list[Method]:
         # don't match keywords
         r"\b(?!\s*if|\s*new|\s*else|\s*while|\s*catch|\s*return|\s*switch|\s*synchronized\b)"
         # match access modifiers
-        r"((?:public\s*|private\s*|protected\s*)*"
+        r"((?:public\s*|protected\s*)*"
         # match modifiers
         r"(?:static\s*|final\s*|native\s*|synchronized\s*|abstract\s*|default\s*|transient\s*)*"
         # match return type
@@ -127,12 +226,41 @@ def get_methods(code: str) -> list[Method]:
 
     matches = re.findall(method_signature_pattern, code)
     for signature in matches:
+        if 'private' in signature:
+            continue
+
         body = get_next_method(code, code.index(signature)+len(signature)+1)
-        method_comment = get_comment_before(code, code.index(signature)-1)
         if body == "":
             continue
-        methods.append(Method(signature, body, method_comment))
+        parent_class = get_parent_class(
+            code, code.index(signature)-1, class_signatures)
+        method_comment = get_comment_before(code, code.index(signature)-1)
+
+        constructor = is_constructor(signature)
+        methods.append(Method(signature, body, method_comment,
+                       parent_class, constructor))
+
     return methods
+
+
+def is_constructor(signature: str) -> bool:
+    constructor_pattern = r"^\s*((?:public\s*|protected\s*|)(?:[A-Za-z0-9<>])+\s*(?:\([A-Za-z0-9 ,<>\?]*\)))"
+    matches = re.findall(constructor_pattern, signature)
+    if matches:
+        return True
+    return False
+
+
+def get_parent_class(code: str, index: int, class_signatures: list[str]) -> str:
+    if len(class_signatures) == 1:
+        return class_signatures[0]
+    for i in range(index, -1, -1):
+        if code[i:i+5] == 'class':
+            for signature in class_signatures:
+                lower = (i-10 if i-10 >= 0 else 0)
+                upper = (i+200 if i+200 < len(code) else len(code))
+                if signature['signature'] in code[lower:upper]:
+                    return signature
 
 
 def get_comment_before(code: str, index: int) -> str:
@@ -192,7 +320,7 @@ def get_next_method(code: str, index: int) -> str:
     return body
 
 
-def get_class_comments(code: str) -> list[str]:
+def parse_class_comments(code: str) -> list[str]:
     """Gets the class comments, matching the '/**' for the start, and '*/' for the end
 
     Args:
@@ -251,45 +379,3 @@ def find_packages(repository_root: Path) -> list[Path]:
         if item.is_dir() and "src" in str(item.name):
             packages.append(item)
     return packages
-
-
-def run_static_code_analysis(package: Path) -> dict:
-    """Run the PMD static code analysis cli tool, and return the results
-
-    Args:
-        package (Path): Path to the package to run the analysis on
-
-    Returns:
-        dict: Key - Path to file, Value - StaticAnalysisData where we have the path, and the violations
-    """
-    output_file = package.joinpath('output.json')
-    staticAnalysisData = {}
-    with open(output_file) as file:
-        data = json.load(file)
-        for file in data["files"]:
-            staticAnalysisData[file["filename"]] = StaticAnalysisData(
-                file["filename"], file["violations"])
-    return staticAnalysisData
-    # This is needed, but is commented out since running this against the repository takes quite a bit of time.
-    # I have pregenerated the files, and they are being loaded above
-
-    # command = [
-    #     '/Users/jake/Applications/pmd-bin-7.0.0-rc2/bin/pmd', 'check',
-    #     '-D', package.absolute(),
-    #     '-R', 'rulesets/java/quickstart.xml',
-    #     '-f', 'json'
-    # ]
-
-    # output_file = package.joinpath('output.json')
-
-    # with open(output_file, 'w') as f:
-    #     process = subprocess.Popen(command, stdout=f, stderr=subprocess.PIPE)
-    #     _, stderr = process.communicate()
-
-    #     if process.returncode == 0:
-    #         print('Command executed successfully.')
-    #     else:
-    #         print(f'Command failed with return code {process.returncode}.')
-    #         print('Error output:')
-    #         print(stderr.decode('utf-8'))
-    #     pass

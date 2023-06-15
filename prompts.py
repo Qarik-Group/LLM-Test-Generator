@@ -1,53 +1,91 @@
 from package import Package
 from code_file import CodeFile
 from langugageLookup import language_data
-from langugageLookup import llm_data
 from pathlib import Path
 from method import Method
+import json
 
 
-def fill_out_prompts(packages: list[Package], ext: str):
-
+def fill_out_prompts(packages: list[Package], ext: str) -> dict:
+    prompts = {}
     for package in packages:
         for file, code_file in package.source_code.items():
+            prompts[file] = []
             for method in code_file.methods:
-
+                if 'static' in method.signature or 'private' in method.signature or method.is_constructor:
+                    continue
                 template_values = gather_template_values(
-                    ext, package, code_file, method)
-                populate_template(template_values)
+                    ext, package, code_file, method,)
+                prompt = populate_template(template_values)
+                prompts[file].append(prompt)
+    print(f'Prepped {len(prompts)} prompts')
+    return prompts
 
 
 def gather_template_values(language: str, package: Package, code_file: CodeFile, method: Method) -> dict:
     template_data = {}
     template_data['language'] = language
-    template_data['testing_framework'] = language_data[language]["testing_frameworks"][0]
-    if str(code_file.path.absolute()) in package.static_analysis_data:
-        template_data['static_code_analysis'] = package.static_analysis_data[str(
-            code_file.path.absolute())].violations
-    else:
-        template_data['static_code_analysis'] = ''
+    template_data['testing_framework'] = language_data[language]["testing_frameworks"][0]['name']
+    template_data['testing_framework_generic_import'] = language_data[language]["testing_frameworks"][0]['generic_import']
+
+    template_data['logging_framework'] = language_data[language]["logging"][0]
+
+    template_data['static_code_analysis'] = code_file.static_code_analysis
     template_data['source_code'] = str(method)
+    reference_code = []
+
+    template_data['reference_package_info'] = []
+
+    for source_code in package.source_code.values():
+        reference_methods = source_code.methods.copy()
+        populate_reference_class_signature(
+            template_data, source_code.class_signatures)
+        for method in reference_methods:
+            reference_code.append(
+                f'{method.signature} belongs to {method.parent_class["signature"]}')
+    template_data['source_code_implements'] = ''
+    template_data['source_code_extends'] = ''
+    template_data['source_code_fields'] = code_file.fields
+    if 'implements' in code_file.class_signatures[0]:
+        template_data['source_code_implements'] = code_file.class_signatures[0]['implements']
+    if 'extends' in code_file.class_signatures[0]:
+        template_data['source_code_extends'] = code_file.class_signatures[0]['extends']
+
+    template_data['reference_methods'] = str(reference_code)
     template_data['code_imports'] = code_file.imports
     template_data['notes'] = ''
-    template_data['code_comments'] = ''
-    # {overview} - Overview of the target project. Initially can be the top-level readme, and eventually could be a summary from the LLM
-    # {language} - Programming language the source code is in
-    # {testing_framework} - Framework used for testing
-    # {source_code} - Code that will be tested (can be any length, method, class, or more, if needed)
-    # {code_imports} - Specific imports for the source code file
-    # {code_comments} - Method and or class comments to provide context
-    # {static_code_analysis} - results for static code analysis
-    # {notes} - Any additional comments to add to the prompt
-
+    template_data['class_comments'] = code_file.class_comments
+    template_data['package'] = package.package_path
+    template_data['method_comments'] = [method.comment]
     return template_data
 
 
-def populate_template(template_data: dict) -> str:
-    with open("template_prompts/methodprompt.txt", "r") as file:
-        template = file.read()
-        template = template.format(**template_data)
-        if template_data['static_code_analysis']:
-            print(template)
+def populate_reference_class_signature(template_data: dict, class_signatures: list[dict]):
+    reference_sig = ''
+    for value in class_signatures:
+        reference_sig += f'{value["name"]} -- type: {value["type"]}'
+        if 'extends' in value:
+            reference_sig += " extends: " + ', '.join(value["extends"])
+        if 'implements' in value:
+            reference_sig += " implements: " + ', '.join(value["implements"])
+
+        reference_sig += ','
+
+    template_data['reference_package_info'].append(reference_sig)
+
+
+def populate_template(template_data: dict) -> dict:
+    with open("template_prompts/methodprompt.json", "r") as file:
+        data = json.load(file)
+        context = ''
+        for item in data["context"]:
+            title = str(item).replace('_', ' ')
+            context += f'{title}: {data["context"][item].format(**template_data)} \n'
+        question = data["question"].format(**template_data)
+        context = context.replace('static code analysis: []', '')
+        context = context.replace('method comments: ['']', '')
+
+        return {'question': question, 'context': context}
 
 # Provide the values for the placeholders
 # values = {
