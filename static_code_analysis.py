@@ -1,11 +1,17 @@
 from sonarqube import SonarQubeClient
 import subprocess
-import time
 from pathlib import Path
-import json
 
 
-def analyze(directory: Path):
+def analyze(directory: Path) -> dict:
+    """Uses Sonarqube to statically analyze the codebase
+
+    Args:
+        directory (Path): path to the codebase
+
+    Returns:
+        dict: results from the analysis
+    """
     start_sonarqube()
     project = directory.parts[-1]
     sonar = SonarQubeClient(sonarqube_url="http://localhost:9000",
@@ -24,9 +30,17 @@ def analyze(directory: Path):
 
 
 def parse_results(results: dict, directory: Path) -> dict:
+    """Parse results from issues - gets all the messages
+
+    Args:
+        results (dict): the querying results
+        directory (Path): path to the repository
+
+    Returns:
+        dict: parsed results
+    """
     parsed_results = {}
-    # with open("data.json", "w") as json_file:
-    #     json.dump(results, json_file)
+
     for issue in results['issues']:
         if not (".java" in issue['component']):
             continue
@@ -39,12 +53,20 @@ def parse_results(results: dict, directory: Path) -> dict:
 
 
 def shutdown_sonarqube():
+    """Asyncronously shuts down sonarqube
+    """
     print('---\tStopping Sonarqube Server\t---')
     # subprocess.Popen(
     #     ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "stop"], stdout=subprocess.DEVNULL)
 
 
 def run_analysis(cached: bool, path: str):
+    """Runs the analysis of the codebase
+
+    Args:
+        cached (bool): If the repository has already been analyzed, dont do it again
+        path (str): Path to the repository
+    """
     if cached:
         print('Project has been previously analyzed. Skipping analysis')
         return
@@ -62,11 +84,22 @@ def run_analysis(cached: bool, path: str):
 
 
 def retrieve_results(sonar: SonarQubeClient, project: str):
+    """Queries the Sonarqube server for static code analysis results
+
+    Args:
+        sonar (SonarQubeClient): The sonarqube client object to query
+        project (str): the project we are querying
+
+    Returns:
+        _type_: issues found
+    """
     print('---\tQuerying for Results\t---')
     return sonar.issues.search_issues(componentKeys=project, branch="main")
 
 
 def start_sonarqube():
+    """Starts sonarqube in the background, and waits 40 seconds for it to spin up before continuing
+    """
     print('---\tSonarqube Server Starting\t---')
     # subprocess.Popen(
     #     ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "console"], stdout=subprocess.DEVNULL)

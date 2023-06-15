@@ -4,7 +4,6 @@ from method import Method
 from package import Package
 from pathlib import Path
 import re
-from static_analysis_data import StaticAnalysisData
 from static_code_analysis import analyze
 
 
@@ -51,6 +50,14 @@ def preprocess(directory: Path, ext: str) -> list[Package]:
 
 
 def parse_package_value(path: Path) -> str:
+    """Parses the package from a file path
+
+    Args:
+        path (Path): path to a java source code file
+
+    Returns:
+        str: package value
+    """
     package_parts = []
     path, _ = os.path.split(path)
     while True:
@@ -79,7 +86,7 @@ def parse_file(file: Path, static_code_analysis: list[dict]) -> CodeFile:
         java_code = input_file.read()
         package = parse_package(java_code)
         class_signatures = parse_class(java_code)
-        class_signatures = get_signature_info(class_signatures)
+        class_signatures = get_class_signature_info(class_signatures)
 
         imports = parse_imports(java_code)
         class_comments = parse_class_comments(java_code.splitlines())
@@ -91,6 +98,14 @@ def parse_file(file: Path, static_code_analysis: list[dict]) -> CodeFile:
 
 
 def parse_class_fields(code: str) -> list[str]:
+    """Parses the class fields from a file
+
+    Args:
+        code (str): code content
+
+    Returns:
+        list[str]: list of fields
+    """
     field_pattern = (
         # Access modifiers
         r'((?:public\s*|protected\s*|private\s*)*'
@@ -110,7 +125,15 @@ def parse_class_fields(code: str) -> list[str]:
     return fields
 
 
-def get_signature_info(class_signatures: list[str]) -> list[str]:
+def get_class_signature_info(class_signatures: list[str]) -> list[dict]:
+    """Parses the class signature for relevant information
+
+    Args:
+        class_signatures (list[str]): all of the signatures in a file
+
+    Returns:
+        list[dict]: Parsed signature
+    """
     signatures = []
     for signature in class_signatures:
         typ = ('class'if 'class' in signature else
@@ -244,6 +267,14 @@ def parse_methods(code: str, class_signatures: list[str]) -> list[Method]:
 
 
 def is_constructor(signature: str) -> bool:
+    """Simple check if the signature is a constructor
+
+    Args:
+        signature (str): the signature we are checking
+
+    Returns:
+        bool: result if it is a constructor
+    """
     constructor_pattern = r"^\s*((?:public\s*|protected\s*|)(?:[A-Za-z0-9<>])+\s*(?:\([A-Za-z0-9 ,<>\?]*\)))"
     matches = re.findall(constructor_pattern, signature)
     if matches:
@@ -252,6 +283,16 @@ def is_constructor(signature: str) -> bool:
 
 
 def get_parent_class(code: str, index: int, class_signatures: list[str]) -> str:
+    """Reverse searches from index of start of method till it finds a class signature
+
+    Args:
+        code (str): source code contents
+        index (int): start of the method
+        class_signatures (list[str]): all class signatures found in the file
+
+    Returns:
+        str: class signature found
+    """
     if len(class_signatures) == 1:
         return class_signatures[0]
     for i in range(index, -1, -1):
