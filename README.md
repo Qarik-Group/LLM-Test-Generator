@@ -5,6 +5,7 @@ Proof of concept: Can a Large Language Model Generate Unit tests
 You need to be signed into the gcloud cli tool.
 - Run `gcloud auth login`
 And you need to be using a project with vertex AI enabled
+- Install maven
 
 ## Running
 
