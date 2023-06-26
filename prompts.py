@@ -18,12 +18,17 @@ def fill_out_prompts(packages: list[Package], ext: str) -> dict:
     prompts = {}
     for package in packages:
         for file, code_file in package.source_code.items():
+            if code_file.class_signatures[0]['type'] == 'interface':
+                continue
             prompts[file] = []
+            print(f'Preparing prompts for: {str(file)}')
             for method in code_file.methods:
-                if 'static' in method.signature or 'private' in method.signature or method.is_constructor:
+
+                if not method.signature or not method.signature.access or 'private' == method.signature.access or method.is_constructor:
                     continue
+
                 template_values = gather_template_values(
-                    ext, package, code_file, method,)
+                    ext, package, code_file, method)
                 prompt = populate_template(template_values)
                 prompts[file].append(prompt)
     print(f'Prepped {len(prompts)} prompts')
@@ -42,32 +47,62 @@ def gather_template_values(language: str, package: Package, code_file: CodeFile,
     Returns:
         dict: template values for prompt
     """
+
     template_data = {}
     template_data['language'] = language
+    template_data['test_name'] = f'{method.parent_class["name"]}-Gen'
+    template_data['package'] = package.package
+    template_data['logging_framework'] = language_data[language]["logging"][0]
     template_data['testing_framework'] = language_data[language]["testing_frameworks"][0]['name']
     template_data['testing_framework_generic_import'] = language_data[language]["testing_frameworks"][0]['generic_import']
-    template_data['logging_framework'] = language_data[language]["logging"][0]
     template_data['static_code_analysis'] = code_file.static_code_analysis
-    template_data['source_code'] = str(method)
-    template_data['reference_package_info'] = []
-    for source_code in package.source_code.values():
-        populate_reference_class_signature(
-            template_data, source_code.class_signatures)
-        method = populate_reference_methods(source_code.methods)
-    template_data['source_code_implements'] = ''
-    template_data['source_code_extends'] = ''
-    template_data['source_code_fields'] = code_file.fields
-    if 'implements' in code_file.class_signatures[0]:
-        template_data['source_code_implements'] = code_file.class_signatures[0]['implements']
-    if 'extends' in code_file.class_signatures[0]:
-        template_data['source_code_extends'] = code_file.class_signatures[0]['extends']
+    template_data['target_method_comment'] = method.comment
+    template_data['target_method_signature'] = json.dumps(
+        method.signature.to_dict())
+    template_data['target_method_body'] = method.body
 
+    template_data['class_signature'] = method.parent_class['signature']
+    template_data['class_type'] = method.parent_class['type']
+    template_data['class_name'] = method.parent_class['name']
+    template_data['class_implements'] = ''
+    template_data['class_extends'] = ''
+
+    if 'implements' in method.parent_class:
+        template_data['class_implements'] = method.parent_class['implements']
+    if 'extends' in method.parent_class:
+        template_data['class_extends'] = method.parent_class['extends']
+    template_data['class_comments'] = code_file.class_comments
+
+    template_data['class_imports'] = code_file.imports
+
+    template_data['reference_package_info'] = []
+    create_reference_context(package, template_data)
     template_data['code_imports'] = code_file.imports
     template_data['notes'] = ''
     template_data['class_comments'] = code_file.class_comments
-    template_data['package'] = package.package_path
     template_data['method_comments'] = [method.comment]
     return template_data
+
+
+def create_reference_context(package, template_data):
+    for source_code in package.source_code.values():
+        info = {}
+        for clas in source_code.class_signatures:
+            info['class_signature'] = clas['signature']
+            info['class_type'] = clas['type']
+            info['class_name'] = clas['name']
+            info['class_implements'] = ''
+            info['class_extends'] = ''
+
+            if 'implements' in clas:
+                info['class_implements'] = clas['implements']
+            if 'extends' in clas:
+                info['class_extends'] = clas['extends']
+            info['class_imports'] = source_code.imports
+            info['class_comments'] = source_code.class_comments
+            info['class_methods'] = [
+                json.dumps(meth.signature.to_dict()) if meth.signature else "" for meth in source_code.methods]
+        template_data['reference_package_info'].append(info)
 
 
 def populate_reference_methods(methods: list[Method], template_data: dict):
@@ -114,14 +149,31 @@ def populate_template(template_data: dict) -> dict:
     Returns:
         dict: the finished prompt
     """
-    with open("template_prompts/methodprompt.json", "r") as file:
+    with open("template_prompts/methodprompt2.json", "r") as file:
         data = json.load(file)
         context = ''
-        for item in data["context"]:
-            title = str(item).replace('_', ' ')
-            context += f'{title}: {data["context"][item].format(**template_data)} \n'
-        question = data["question"].format(**template_data)
-        context = context.replace('static code analysis: []', '')
-        context = context.replace('method comments: ['']', '')
+        unjoined_context = {}
 
-        return {'question': question, 'context': context}
+        format_nested_dictionary(data["context"], template_data)
+        data['context']['reference_package_info'] = []
+        for reference in template_data['reference_package_info']:
+            prompt_item = data['reference_package_info_item']
+            template_item = {}
+            for key, val in prompt_item.items():
+                formatted_value = val.format(**reference)
+                template_item[key] = formatted_value
+            data['context']['reference_package_info'].append(template_item)
+        with open('final_prompta.json', 'w') as file:
+            json.dump(data, file)
+        json_data = json.dumps(data['context'])
+        return {'question': data['question'], 'context': json_data}
+
+
+def format_nested_dictionary(template_dict, value_dict):
+    for key, value in template_dict.items():
+        if isinstance(value, dict):
+            # Recursive call for nested dictionaries
+            format_nested_dictionary(value, value_dict)
+        elif isinstance(value, str):
+            template = value.format(**value_dict)
+            template_dict[key] = template

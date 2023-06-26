@@ -33,9 +33,8 @@ def run():
     pre_processed_packages = preprocess(args.project_path, args.ext)
     filled_out_prompts = fill_out_prompts(
         pre_processed_packages, args.ext)
-    llm.generate_tests(filled_out_prompts)
-    postprocess()
-    pass
+    results = llm.generate_tests(filled_out_prompts)
+    postprocess(results)
 
 
 def dir_path(string) -> Path:
