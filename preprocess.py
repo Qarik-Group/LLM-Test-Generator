@@ -5,6 +5,7 @@ from package import Package
 from pathlib import Path
 import re
 from static_code_analysis import analyze
+from method_signature import MethodSignature
 
 
 def preprocess(directory: Path, ext: str) -> list[Package]:
@@ -37,6 +38,7 @@ def preprocess(directory: Path, ext: str) -> list[Package]:
             if code is None:
                 continue
             source_files[str(file.absolute())] = code
+        # Commented out for quicker processing
         # for file in test_file_paths:
         #     code: CodeFile = parse_file(file)
         #     if code is None:
@@ -93,6 +95,7 @@ def parse_file(file: Path, static_code_analysis: list[dict]) -> CodeFile:
         fields = parse_class_fields(java_code)
         methods = parse_methods(java_code, class_signatures)
         if len(methods) == 0:
+            print(f'Skipping {str(file.absolute())}')
             return None
         return CodeFile(class_signatures, class_comments, fields, methods, file, package, imports, static_code_analysis)
 
@@ -118,9 +121,13 @@ def parse_class_fields(code: str) -> list[str]:
         # Optional assignment value
         r'(?:\s*=\s*[A-Za-z0-9" \.]*)*;)'
     )
+    enum_field_pattern = r'^\s*((?:[A-Za-z0-9])+(?:\([A-Za-z0-9-]*\))*);'
     matches = re.findall(field_pattern, code)
+    enum_field_matches = re.findall(enum_field_pattern, code)
     fields = []
     for field in matches:
+        fields.append(field)
+    for field in enum_field_matches:
         fields.append(field)
     return fields
 
@@ -219,7 +226,7 @@ def parse_imports(code: str) -> list[str]:
     return imports
 
 
-def parse_methods(code: str, class_signatures: list[str]) -> list[Method]:
+def parse_methods(code: str, class_signatures: list[dict]) -> list[Method]:
     """Retrieves all the methods in a file, parsing by method comments, method signatures, and method body
 
     Args:
@@ -229,41 +236,56 @@ def parse_methods(code: str, class_signatures: list[str]) -> list[Method]:
         list[Method]: A list of Methods found in the file, may be empty
     """
     methods = []
-    method_signature_pattern = (
-        # don't match keywords
-        r"\b(?!\s*if|\s*new|\s*else|\s*while|\s*catch|\s*return|\s*switch|\s*synchronized\b)"
-        # match access modifiers
-        r"((?:public\s*|protected\s*)*"
-        # match modifiers
-        r"(?:static\s*|final\s*|native\s*|synchronized\s*|abstract\s*|default\s*|transient\s*)*"
-        # match return type
-        r"(?:void\s|[A-Za-z0-9<>\[\]\?, \.]+\s*)"
-        # match method name
-        r"(?:\w+\s*)"
-        # match method parameters
-        r"(?:\([A-Za-z0-9 ,<>\?]*\))"
-        # match exception throws
-        r"(?: throws \w+|))"
-        # match curly brackets and new lines
-        r"(?:\s*{)(?:\n*\s*)")
+
+    method_signature_pattern = (r'\b(?!\s*if|\s*new|\s*else|\s*while|\s*catch|\s*return|\s*switch|\s*synchronized\b)((?:public\s*|protected\s*)*(?:static\s*|final\s*|native\s*|synchronized\s*|abstract\s*|default\s*|transient\s*)*(?:void\s|[A-Za-z0-9<>\[\]\?, \.]+\s*)(?:\w+\s*)(?:\([A-Za-z0-9 ,<>\?\[\]]*\))(?: throws \w+|))(?:\s*[{;])(?:\n*\s*)'
+                                )
 
     matches = re.findall(method_signature_pattern, code)
     for signature in matches:
-        if 'private' in signature:
-            continue
-
-        body = get_next_method(code, code.index(signature)+len(signature)+1)
+        body = get_next_method(code, code.index(
+            signature)+len(signature)+1)
         if body == "":
             continue
         parent_class = get_parent_class(
             code, code.index(signature)-1, class_signatures)
-        method_comment = get_comment_before(code, code.index(signature)-1)
+        if not_method(signature, code, parent_class):
+            continue
+        method_comment = get_comment_before(
+            code, code.index(signature)-1)
 
         constructor = is_constructor(signature)
-        methods.append(Method(signature, body, method_comment,
+        signature_obj = parse_method_signature(signature)
+
+        methods.append(Method(signature_obj, body, method_comment,
                        parent_class, constructor))
 
     return methods
+
+
+def parse_method_signature(signature: str) -> MethodSignature:
+    """Parse out the components of a java method signature
+
+    Args:
+        signature (str): String version of the signature
+
+    Returns:
+        MethodSignature: A fully parsed signature object
+    """
+    signature_parts_pattern = (r'^(public\s|private\s|protected\s)*'
+                               r'(static\s)*(synchronized\s)*'
+                               r'(void\s|[A-Za-z0-9<>]*\s)*'
+                               r'([A-Za-z0-9]*)'
+                               r'\(([A-Za-z0-9 <>,\[\]]*)\)')
+    match = re.search(signature_parts_pattern, signature)
+    if match:
+        access = match.group(1) if match.group(1) else ''
+        static = match.group(2) if match.group(2) else ''
+        synchronized = match.group(3) if match.group(3) else ''
+        ret_val = match.group(4) if match.group(4) else ''
+        name = match.group(5) if match.group(5) else ''
+        parameters = (match.group(6) if match.group(6) else '').split(',')
+        return MethodSignature(access, [static, synchronized], ret_val, name, parameters, [])
+    return None
 
 
 def is_constructor(signature: str) -> bool:
@@ -279,6 +301,30 @@ def is_constructor(signature: str) -> bool:
     matches = re.findall(constructor_pattern, signature)
     if matches:
         return True
+    return False
+
+
+def not_method(signature: str, code: str, class_signatures: dict) -> bool:
+    """Helper method to identify if the signature is a method, or a method call
+
+    Args:
+        signature (str): string signature to check
+        code (str): code to get context from
+        class_signature (dict): all classes found inside code file
+
+    Returns:
+        bool: result of if it is a proper method or not
+    """
+    if not signature or not class_signatures:
+        return True
+    if class_signatures['type'] == 'interface':
+        return False
+    next = code.index(signature)+len(signature)
+    for c in code[next:]:
+        if c == ';':
+            return True
+        if c == '{':
+            return False
     return False
 
 
@@ -346,7 +392,7 @@ def get_next_method(code: str, index: int) -> str:
         str: _description_
     """
     if code[index] != "{":
-        print("Expected a '{' " + f"but got '{code[index]}'")
+        # print("Expected a '{' " + f"but got '{code[index]}'")
         return
     curly_stack = []
     body = ""

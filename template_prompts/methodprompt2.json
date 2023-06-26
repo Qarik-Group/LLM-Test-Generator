@@ -1,0 +1,36 @@
+{
+    "context": {
+        "language": "{language}",
+        "test_name": "{test_name}",
+        "package": "{package}",
+        "logging_framework": "{logging_framework}",
+        "testing_framework": "{testing_framework}",
+        "testing_framework_generic_import": "{testing_framework_generic_import}",
+        "source_code": {
+            "target_method_comment": "{target_method_comment}",
+            "target_method_signature": "{target_method_signature}",
+            "target_method_body": "{target_method_body}",
+            "class_signature": "{class_signature}",
+            "class_type": "{class_type}",
+            "class_name": "{class_name}",
+            "class_implements": "{class_implements}",
+            "class_extends": "{class_extends}",
+            "class_imports": "{class_imports}",
+            "class_comments": "{class_comments}"
+        },
+        "reference_package_info": " {reference_package_info}",
+        "static_code_analysis": "{static_code_analysis}",
+        "notes": "{notes}"
+    },
+    "reference_package_info_item": {
+        "class_signature": "{class_signature}",
+        "class_type": "{class_type}",
+        "class_name": "{class_name}",
+        "class_implements": "{class_implements}",
+        "class_extends": "{class_extends}",
+        "class_imports": "{class_imports}",
+        "class_comments": "{class_comments}",
+        "class_methods": "{class_methods}"
+    },
+    "question": "Based on the given context, formatted in json, please generate line unit tests for the source_code target_method_body using the following criteria:\n- Tests should cover reasonable input, output, edge cases\n- Do not use assert throws\n- Do not assume there are public getters and setters unless found in the source code\n- Do not test getters and setters\n- When calling a method, make sure you use the correct parameter types\n- Use the reference code to help create objects, but only test the source code\n- Do not make unreachable code\n- Do not use methods that are not in the reference methods, or java source code, unless they are explicitly mentioned in the prompt and are necessary to test the functionality of the class.\n- Interfaces - When using an interface, prefer an implementation given, otherwise use an anonymous class\n- Formatting: \n- Name the test class the test_name that is found in the context\n- Tests should have clear, descriptive method names\n- Test comments should be included when complexity warrants it.\n- Do not use mocks.\n- Include package name\n- Use assertions\n- Include imports to the class being tested\n- Include imports to testing framework libraries used"
+}

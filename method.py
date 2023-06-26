@@ -1,8 +1,9 @@
 import textwrap
+from method_signature import MethodSignature
 
 
 class Method:
-    def __init__(self, signature: str, body: str, comment: str, parent_class: str, is_constructor: bool) -> None:
+    def __init__(self, signature: MethodSignature, body: str, comment: str, parent_class: dict, is_constructor: bool) -> None:
         self.signature = signature
         self.body = body
         self.comment = comment

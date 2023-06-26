@@ -3,6 +3,7 @@
         "language": "{language}",
         "logging_framework": "{logging_framework}",
         "testing_framework": "{testing_framework}",
+        "testing_framework_generic_import": "{testing_framework_generic_import}",
         "source_code": "{source_code}",
         "source_code_implements": "{source_code_implements}",
         "source_code_extends": "{source_code_extends}",

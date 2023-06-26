@@ -1,6 +1,8 @@
 from sonarqube import SonarQubeClient
 import subprocess
 from pathlib import Path
+import time
+import os
 
 
 def analyze(directory: Path) -> dict:
@@ -12,16 +14,22 @@ def analyze(directory: Path) -> dict:
     Returns:
         dict: results from the analysis
     """
+
+    if 'SONAR_USER' not in os.environ or 'SONAR_PASS' not in os.environ:
+        print('Please add your sonarqube credentials to the \'SONAR_USER\' and \'SONAR_PASS\' environment variables')
+        exit(1)
+    username = os.environ['SONAR_USER']
+    password = os.environ['SONAR_PASS']
     start_sonarqube()
     project = directory.parts[-1]
     sonar = SonarQubeClient(sonarqube_url="http://localhost:9000",
-                            username='admin', password='admin1')
+                            username=username, password=password)
     projects = sonar.projects.search_projects(
         projects=[project])
     found = any(component['key'] ==
                 project for component in projects['components'])
 
-    run_analysis(found, str(directory.absolute()))
+    run_analysis(found, str(directory.absolute()), username, password)
     results = retrieve_results(sonar, project)
     parsed_results = parse_results(results, directory)
 
@@ -56,30 +64,31 @@ def shutdown_sonarqube():
     """Asyncronously shuts down sonarqube
     """
     print('---\tStopping Sonarqube Server\t---')
-    # subprocess.Popen(
-    #     ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "stop"], stdout=subprocess.DEVNULL)
+    subprocess.Popen(
+        ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "stop"], stdout=subprocess.DEVNULL)
 
 
-def run_analysis(cached: bool, path: str):
+def run_analysis(cached: bool, path: str, sonar_user: str, sonar_pass: str):
     """Runs the analysis of the codebase
 
     Args:
         cached (bool): If the repository has already been analyzed, dont do it again
         path (str): Path to the repository
     """
-    if cached:
-        print('Project has been previously analyzed. Skipping analysis')
-        return
+    # if cached:
+    #     print('Project has been previously analyzed. Skipping analysis')
+    #     return
     print('---\tStatic Code Analysis Starting\t---')
-
     subprocess.run(
         ["/Users/jake/Applications/apache-maven-3.9.2 2/bin/mvn",
          "sonar:sonar",
          "-Dsonar.host.url=http://localhost:9000",
-         "-Dsonar.login=admin",
-         "-Dsonar.password=admin1"],
+         "-Dsonar.jacoco.reportPaths=**/*.xml",
+         "-Dsonar.coverage.jacoco.xmlReportPaths=**/*.xml",
+         f"-Dsonar.login={sonar_user}",
+         f"-Dsonar.password={sonar_pass}"],
         cwd=path,
-        stdout=subprocess.DEVNULL)
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print('---\tStatic Code Analysis Finished\t---')
 
 
@@ -101,8 +110,8 @@ def start_sonarqube():
     """Starts sonarqube in the background, and waits 40 seconds for it to spin up before continuing
     """
     print('---\tSonarqube Server Starting\t---')
-    # subprocess.Popen(
-    #     ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "console"], stdout=subprocess.DEVNULL)
-    # # Sleeps until the server has started.
-    # time.sleep(40)
+    subprocess.Popen(
+        ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "console"], stdout=subprocess.DEVNULL)
+    # Sleeps until the server has started.
+    time.sleep(40)
     print('---\tSonarqube Server Started\t---')
