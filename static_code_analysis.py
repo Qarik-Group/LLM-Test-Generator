@@ -82,7 +82,7 @@ def shutdown_sonarqube():
     """Asyncronously shuts down sonarqube
     """
     logging.info('Stopping Sonarqube Server')
-    # subprocess.Popen(["sonar.sh", "stop"], stdout=subprocess.DEVNULL)
+    subprocess.Popen(["sonar.sh", "stop"], stdout=subprocess.DEVNULL)
 
 
 def run_analysis(cached: bool, path: str, sonar_user: str, sonar_pass: str):
@@ -93,17 +93,17 @@ def run_analysis(cached: bool, path: str, sonar_user: str, sonar_pass: str):
         path (str): Path to the repository
     """
     logging.info('Static Code Analysis Starting')
-    # subprocess.run(
-    #     ["mvn",
-    #      "sonar:sonar",
-    #      "-Dsonar.host.url=http://localhost:9000",
-    #      "-Dsonar.jacoco.reportPaths=**/*.xml",
-    #      "-Dsonar.coverage.jacoco.xmlReportPaths=**/*.xml",
-    #      f"-Dsonar.login={sonar_user}",
-    #      f"-Dsonar.password={sonar_pass}"],
-    #     cwd=path,
-    #     shell=True,
-    #     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(
+        ["mvn",
+         "sonar:sonar",
+         "-Dsonar.host.url=http://localhost:9000",
+         "-Dsonar.jacoco.reportPaths=**/*.xml",
+         "-Dsonar.coverage.jacoco.xmlReportPaths=**/*.xml",
+         f"-Dsonar.login={sonar_user}",
+         f"-Dsonar.password={sonar_pass}"],
+        cwd=path,
+        shell=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     logging.info('Static Code Analysis Finished')
 
 
@@ -125,9 +125,9 @@ def start_sonarqube():
     """Starts sonarqube in the background, and waits 40 seconds for it to spin up before continuing
     """
     logging.info('Sonarqube Server Starting')
-    # subprocess.Popen(["sonar.sh", "console"], stdout=subprocess.DEVNULL)
-    # # Sleeps until the server has started.
-    # for x in range(0, 40, 10):
-    #     logging.info('Waiting for sonarqube to start')
-    #     time.sleep(10)
+    subprocess.Popen(["sonar.sh", "console"], stdout=subprocess.DEVNULL)
+    # Sleeps until the server has started.
+    for x in range(0, 40, 10):
+        logging.info('Waiting for sonarqube to start')
+        time.sleep(10)
     logging.info('Sonarqube Server Started')
