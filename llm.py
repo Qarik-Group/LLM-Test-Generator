@@ -1,6 +1,28 @@
-from vertexai.preview.language_models import ChatModel, InputOutputTextPair
+# Copyright 2023 Qarik Group
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from vertexai.preview.language_models import ChatModel
 import json
 from pathlib import Path
+import logging
+
+# Configure the logging module
+logging.basicConfig(
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    level=logging.INFO
+)
 
 
 def generate_tests(prompts: dict) -> dict:
@@ -22,7 +44,8 @@ def generate_tests(prompts: dict) -> dict:
         results = []
         name = f'{Path(path).stem}GenTest'
         name = name.replace('.', '_')
-        print(f'Generating tests for {str(path)}')
+        logging.info(
+            f'Starting to generate test(s) for {str(Path(path).relative_to(Path("./target_repository/").absolute()))}')
         for prompt in prompt_list:
 
             context = json.loads(prompt['context'])
@@ -34,11 +57,12 @@ def generate_tests(prompts: dict) -> dict:
                 response = chat.send_message(
                     prompt['question'], **parameters)
             except Exception as e:
-                print(f'Error when connecting to the LLM: {e}')
+                logging.warning(f'Error when connecting to the LLM: {e}')
                 continue
 
             results.append(response.text)
-        print(f'Generated test(s) for {str(path)}')
+        logging.info(
+            f'Finished generating test(s) for {str(Path(path).relative_to(Path("./target_repository/").absolute()))}')
 
         res = ''
         path = path.replace('main', 'test')
@@ -46,10 +70,13 @@ def generate_tests(prompts: dict) -> dict:
         test_path = path.with_name(name).with_suffix('.java')
 
         if len(results) > 1:
+            logging.info(
+                f'Multiple tests found for {str(Path(test_path).relative_to(Path("./target_repository/").absolute()))}, combining into 1 test file')
+
             try:
                 res = combine_tests(chat_model, results, parameters)
             except Exception as e:
-                print(f'Failed combining tests: {e}')
+                logging.error(f'Failed combining tests: {e}')
                 continue
 
             final_results[test_path] = res

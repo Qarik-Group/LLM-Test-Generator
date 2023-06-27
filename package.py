@@ -1,3 +1,17 @@
+# Copyright 2023 Qarik Group
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import pathlib
 from code_file import CodeFile
 
@@ -10,49 +24,7 @@ class Package:
         self.source_code = source_code
         self.test_code = test_code
 
-    @property
-    def test_path(self) -> pathlib.Path:
-        return self.package_path.joinpath("tests")
-
-    @property
-    def src_path(self) -> pathlib.Path:
-        return self.package_path.joinpath("main")
-
-    def src_tokens(self) -> int:
-        tokens = 0
-        for src in self.source_code.keys():
-            tokens += int(len(self.source_code[str(src)].split())/.75)
-        return tokens
-
-    def test_tokens(self) -> int:
-        tokens = 0
-        for test in self.test_code.keys():
-            tokens += int(len(self.test_code[str(test)].split())/.75)
-        return tokens
-
-    def validation_tokens(self) -> int:
-        tokens = 0
-        for src in self.source_code.keys():
-            if str(src) in self.static_analysis_data:
-                for violation in self.static_analysis_data[str(src)].violations:
-                    tokens += int(len(violation)/.75)
-        for test in self.test_code.keys():
-            if str(test) in self.static_analysis_data:
-                for violation in self.static_analysis_data[str(test)].violations:
-                    tokens += int(len(violation)/.75)
-        return tokens
-
-    def total_tokens(self) -> int:
-        return self.src_tokens()+self.test_tokens()+self.validation_tokens()
-
-    def get_full_context(self) -> str:
-        context = ""
-        for file in self.source_code:
-            context += self.source_code[file]
-        return context
-
     def __str__(self):
-        temp_result = ""
 
         result = f"{self.package_path.parent.name}"
 

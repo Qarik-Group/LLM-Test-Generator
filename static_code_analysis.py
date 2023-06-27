@@ -1,8 +1,25 @@
+# Copyright 2023 Qarik Group
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from sonarqube import SonarQubeClient
 import subprocess
 from pathlib import Path
 import time
 import os
+import logging
+from logging_config import configure_logging
+configure_logging()
 
 
 def analyze(directory: Path) -> dict:
@@ -16,7 +33,8 @@ def analyze(directory: Path) -> dict:
     """
 
     if 'SONAR_USER' not in os.environ or 'SONAR_PASS' not in os.environ:
-        print('Please add your sonarqube credentials to the \'SONAR_USER\' and \'SONAR_PASS\' environment variables')
+        logging.error(
+            'Please add your sonarqube credentials to the \'SONAR_USER\' and \'SONAR_PASS\' environment variables')
         exit(1)
     username = os.environ['SONAR_USER']
     password = os.environ['SONAR_PASS']
@@ -63,9 +81,8 @@ def parse_results(results: dict, directory: Path) -> dict:
 def shutdown_sonarqube():
     """Asyncronously shuts down sonarqube
     """
-    print('---\tStopping Sonarqube Server\t---')
-    subprocess.Popen(
-        ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "stop"], stdout=subprocess.DEVNULL)
+    logging.info('Stopping Sonarqube Server')
+    # subprocess.Popen(["sonar.sh", "stop"], stdout=subprocess.DEVNULL)
 
 
 def run_analysis(cached: bool, path: str, sonar_user: str, sonar_pass: str):
@@ -75,21 +92,19 @@ def run_analysis(cached: bool, path: str, sonar_user: str, sonar_pass: str):
         cached (bool): If the repository has already been analyzed, dont do it again
         path (str): Path to the repository
     """
-    # if cached:
-    #     print('Project has been previously analyzed. Skipping analysis')
-    #     return
-    print('---\tStatic Code Analysis Starting\t---')
-    subprocess.run(
-        ["/Users/jake/Applications/apache-maven-3.9.2 2/bin/mvn",
-         "sonar:sonar",
-         "-Dsonar.host.url=http://localhost:9000",
-         "-Dsonar.jacoco.reportPaths=**/*.xml",
-         "-Dsonar.coverage.jacoco.xmlReportPaths=**/*.xml",
-         f"-Dsonar.login={sonar_user}",
-         f"-Dsonar.password={sonar_pass}"],
-        cwd=path,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print('---\tStatic Code Analysis Finished\t---')
+    logging.info('Static Code Analysis Starting')
+    # subprocess.run(
+    #     ["mvn",
+    #      "sonar:sonar",
+    #      "-Dsonar.host.url=http://localhost:9000",
+    #      "-Dsonar.jacoco.reportPaths=**/*.xml",
+    #      "-Dsonar.coverage.jacoco.xmlReportPaths=**/*.xml",
+    #      f"-Dsonar.login={sonar_user}",
+    #      f"-Dsonar.password={sonar_pass}"],
+    #     cwd=path,
+    #     shell=True,
+    #     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    logging.info('Static Code Analysis Finished')
 
 
 def retrieve_results(sonar: SonarQubeClient, project: str):
@@ -102,16 +117,17 @@ def retrieve_results(sonar: SonarQubeClient, project: str):
     Returns:
         _type_: issues found
     """
-    print('---\tQuerying for Results\t---')
+    logging.info('Querying for Results')
     return sonar.issues.search_issues(componentKeys=project, branch="main")
 
 
 def start_sonarqube():
     """Starts sonarqube in the background, and waits 40 seconds for it to spin up before continuing
     """
-    print('---\tSonarqube Server Starting\t---')
-    subprocess.Popen(
-        ["/Users/sonarqube-10.0.0.68432/bin/macosx-universal-64/sonar.sh", "console"], stdout=subprocess.DEVNULL)
-    # Sleeps until the server has started.
-    time.sleep(40)
-    print('---\tSonarqube Server Started\t---')
+    logging.info('Sonarqube Server Starting')
+    # subprocess.Popen(["sonar.sh", "console"], stdout=subprocess.DEVNULL)
+    # # Sleeps until the server has started.
+    # for x in range(0, 40, 10):
+    #     logging.info('Waiting for sonarqube to start')
+    #     time.sleep(10)
+    logging.info('Sonarqube Server Started')

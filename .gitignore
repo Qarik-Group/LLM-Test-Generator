@@ -2,6 +2,10 @@
 .vscode/
 *.code-workspace
 
+# Test generator files
+target_repository/
+final_prompts/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-language_data = {
-    "java": {
-        "testing_frameworks": [{"name": "junit", "generic_import": "org.junit.jupiter.api"},
-                               {"name": "spock", "generic_import": "undefined"}],
-        "logging": ["lombok -- Slf4j"]
-    }
-}
+import logging
+
+
+def configure_logging():
+    """Centralize the logging config
+    """
+    logging.basicConfig(
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        level=logging.INFO
+    )

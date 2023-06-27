@@ -1,6 +1,6 @@
 {
     "context": {
-        "language": "{language}",
+        "language": "java",
         "test_name": "{test_name}",
         "package": "{package}",
         "logging_framework": "{logging_framework}",
