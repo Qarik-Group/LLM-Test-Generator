@@ -1,4 +1,20 @@
+# Copyright 2023 Qarik Group
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from pathlib import Path
+import logging
+from logging_config import configure_logging
+configure_logging()
 
 
 def postprocess(results: dict):
@@ -7,15 +23,29 @@ def postprocess(results: dict):
     Args:
         results (dict): the results from the LLM
     """
+    count = 0
     for path, result in results.items():
         content = remove_excess_text(result)
         content = rename_test(path.stem, content)
-
+        count += count_tests(content)
         try:
             save(path, content)
         except Exception as e:
-            print(f'Failed saving file: {e}')
+            logging.warning(f'Failed saving file: {e}')
             continue
+    logging.info(f'Generated a total of {count} tests')
+
+
+def count_tests(content: str) -> int:
+    """Count number of tests generated for file
+
+    Args:
+        content (str): contents of tes file
+
+    Returns:
+        int: number of tests found
+    """
+    return content.count('@Test')
 
 
 def save(path: str, content: str):
@@ -25,8 +55,9 @@ def save(path: str, content: str):
         path (str): path of the new test
         content (str): content to save
     """
-    print(f'Writing tests to {str(path)}')
-    pass
+    logging.info(
+        f'Writing tests to {str(Path(path).relative_to(Path("./target_repository/").absolute()))}')
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'w') as file:
         file.write(content)
 

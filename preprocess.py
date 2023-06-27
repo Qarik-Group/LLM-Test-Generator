@@ -1,3 +1,17 @@
+# Copyright 2023 Qarik Group
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from code_file import CodeFile
 import os
 from method import Method
@@ -6,9 +20,12 @@ from pathlib import Path
 import re
 from static_code_analysis import analyze
 from method_signature import MethodSignature
+import logging
+from logging_config import configure_logging
+configure_logging()
 
 
-def preprocess(directory: Path, ext: str) -> list[Package]:
+def preprocess(directory: Path) -> list[Package]:
     """Preprocesses the entire repository by creating Package objects with the parsed data from all of the files
 
     Args:
@@ -24,8 +41,9 @@ def preprocess(directory: Path, ext: str) -> list[Package]:
     i = 0
     for package_dir in package_dirs:
 
-        source_file_paths = find_files(package_dir, "main", ext)
-        test_file_paths = find_files(package_dir, "test", ext)
+        source_file_paths = find_files(package_dir, "main")
+        if not source_file_paths:
+            continue
         source_files = {}
         test_files = {}
 
@@ -34,16 +52,12 @@ def preprocess(directory: Path, ext: str) -> list[Package]:
 
             if str(file.absolute()) in analysis_data:
                 file_static_analysis = analysis_data[str(file.absolute())]
+
             code: CodeFile = parse_file(file, file_static_analysis)
+            print(f'found {len(code.methods)} methods')
             if code is None:
                 continue
             source_files[str(file.absolute())] = code
-        # Commented out for quicker processing
-        # for file in test_file_paths:
-        #     code: CodeFile = parse_file(file)
-        #     if code is None:
-        #         continue
-        #     test_files[str(file.absolute())] = code
         package = parse_package_value(source_file_paths[0])
 
         packages.append(Package(package, package_dir, source_files,
@@ -95,7 +109,8 @@ def parse_file(file: Path, static_code_analysis: list[dict]) -> CodeFile:
         fields = parse_class_fields(java_code)
         methods = parse_methods(java_code, class_signatures)
         if len(methods) == 0:
-            print(f'Skipping {str(file.absolute())}')
+            logging.warn(
+                f'No methods found. Skipping {str(file.absolute().relative_to(Path("./target_repository").absolute()))}')
             return None
         return CodeFile(class_signatures, class_comments, fields, methods, file, package, imports, static_code_analysis)
 
@@ -434,7 +449,7 @@ def parse_class_comments(code: str) -> list[str]:
     return comments
 
 
-def find_files(package: Path, sub_dir: str, ext: str) -> list[Path]:
+def find_files(package: Path, sub_dir: str) -> list[Path]:
     """Finds all files in a package with a speicifc extension
 
     Args:
@@ -447,7 +462,7 @@ def find_files(package: Path, sub_dir: str, ext: str) -> list[Path]:
     """
     files = []
     for item in package.joinpath(sub_dir).glob('**/*'):
-        if item.is_file() and "."+ext in str(item.name):
+        if item.is_file() and ".java" in str(item.name) and not 'package-info.java' in str(item.name):
             files.append(item)
     return files
 
