@@ -59,11 +59,24 @@ def generate_tests(prompts: dict) -> dict:
             results.append(response.text)
         logging.info(
             f'Finished generating test(s) for {str(Path(path).relative_to(Path("./target_repository/").absolute()))}')
-
+        prepare_final_results(name, results, final_results)
     return final_results
 
 
-def prepare_final_results(name: str, results: list[str], final_results: dict):
+def prepare_final_results(name: str, results: list[str], final_results: dict) -> dict:
+    """Combine results into one file, and make the path the correct place
+
+    Args:
+        name (str): name of the test
+        results (list[str]): results from the LLM
+        final_results (dict): collection of all the results
+
+    Raises:
+        e: Exception from the LLM when combining the tests
+
+    Returns:
+        dict: all the results
+    """
     res = ''
     path = path.replace('main', 'test')
     path = Path(path)
@@ -77,7 +90,7 @@ def prepare_final_results(name: str, results: list[str], final_results: dict):
             res = combine_tests(chat_model, results, parameters)
         except Exception as e:
             logging.error(f'Failed combining tests: {e}')
-            raise BaseException('')
+            raise e
 
         final_results[test_path] = res
     elif results:
@@ -87,7 +100,15 @@ def prepare_final_results(name: str, results: list[str], final_results: dict):
     return final_results
 
 
-def combine_tests(chat_model, results: list[str], parameters: dict):
+def combine_tests(results: list[str]) -> str:
+    """Combine relavant tests
+
+    Args:
+        results (list[str]): Tests to combine
+
+    Returns:
+        str: combined tests
+    """
     chat = chat_model.start_chat(
         context=", ".join(results)
     )
