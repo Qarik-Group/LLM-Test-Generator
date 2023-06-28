@@ -27,24 +27,43 @@ def clone_or_update_repository(repo_url) -> Path:
     logging.info(f'Preparing to clone {repo_url}')
     # Check if the repository directory exists
     if os.path.exists(repo_path):
-        # Check if it's a Git repository
-        if not os.path.isdir(os.path.join(repo_path, '.git')):
-            logging.error(f"Error: {repo_path} is not a Git repository")
-            exit(1)
-        # Check if it's the same repository
-        repo = Repo(repo_path)
-        remote_url = repo.remotes.origin.url
-        if remote_url == repo_url:
-            logging.info(
-                f"The repository {repo_url} is already cloned in {repo_path}. Continuing...")
-            return Path(repo_path)
+        return check_if_cloned(repo_url, repo_path)
 
-        else:
-            logging.error(
-                f"Error: {repo_path} exists but points to a different repository")
-            exit(1)
-    else:
-        # Clone the repository
-        Repo.clone_from(repo_url, repo_path)
-        logging.info(f"Successfully cloned {repo_url} into {repo_path}")
-        return Path(repo_path)
+    # Clone the repository
+    Repo.clone_from(repo_url, repo_path)
+    logging.info(f"Successfully cloned {repo_url} into {repo_path}")
+    return Path(repo_path)
+
+
+def check_if_cloned(repo_url: str, repo_path: str) -> Path:
+    """Checks if the repository is cloned locally, and returns a relative path to it
+
+    Args:
+        repo_url (str): git repo remote cloning url
+        repo_path (str): path to local repository
+
+    Returns:
+        Path: Path to local repository
+    """
+    check_if_git_repo(repo_path)
+
+    # Check if it's the same repository
+    remote_url = Repo(repo_path).remotes.origin.url
+    if remote_url != repo_url:
+        logging.error(
+            f"Error: {repo_path} exists but points to a different repository")
+        exit(1)
+    logging.info(
+        f"The repository {repo_url} is already cloned in {repo_path}. Continuing...")
+    return Path(repo_path)
+
+
+def check_if_git_repo(repo_path: str):
+    """Check if the repo we are looking at locally is a git repository
+
+    Args:
+        repo_path (str): path to local repository
+    """
+    if not os.path.isdir(os.path.join(repo_path, '.git')):
+        logging.error(f"Error: {repo_path} is not a Git repository")
+        exit(1)

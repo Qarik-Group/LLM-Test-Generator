@@ -54,7 +54,6 @@ def preprocess(directory: Path) -> list[Package]:
                 file_static_analysis = analysis_data[str(file.absolute())]
 
             code: CodeFile = parse_file(file, file_static_analysis)
-            print(f'found {len(code.methods)} methods')
             if code is None:
                 continue
             source_files[str(file.absolute())] = code
@@ -258,7 +257,7 @@ def parse_methods(code: str, class_signatures: list[dict]) -> list[Method]:
     matches = re.findall(method_signature_pattern, code)
     for signature in matches:
         body = get_next_method(code, code.index(
-            signature)+len(signature)+1)
+            signature)+len(signature))
         if body == "":
             continue
         parent_class = get_parent_class(
@@ -396,6 +395,15 @@ def get_comment_before(code: str, index: int) -> str:
     return comment[::-1]
 
 
+def find_opening_bracket(code: str, starting_index: int) -> int:
+    found = starting_index
+    for c in code[starting_index:]:
+        found += 1
+        if c == '{':
+            return found
+    return starting_index
+
+
 def get_next_method(code: str, index: int) -> str:
     """Retrieves the next method, starting at the index given
 
@@ -406,8 +414,9 @@ def get_next_method(code: str, index: int) -> str:
     Returns:
         str: _description_
     """
+    index = find_opening_bracket(code, index)
     if code[index] != "{":
-        # print("Expected a '{' " + f"but got '{code[index]}'")
+        logging.error("Tried to find a method, but none was found")
         return
     curly_stack = []
     body = ""
