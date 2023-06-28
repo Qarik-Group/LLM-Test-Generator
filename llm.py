@@ -16,29 +16,25 @@ from vertexai.preview.language_models import ChatModel
 import json
 from pathlib import Path
 import logging
+from logging_config import configure_logging
+configure_logging()
 
-# Configure the logging module
-logging.basicConfig(
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    level=logging.INFO
-)
+parameters = {
+    # Temperature controls the degree of randomness in token selection.
+    "temperature": .8,
+    # Token limit determines the maximum amount of text output.
+    "max_output_tokens": 1024,
+    # Tokens are selected from most probable to least until the sum of their probabilities equals the top_p value.
+    "top_p": 0.4,
+    # A top_k of 1 means the selected token is the most probable among all tokens.
+    "top_k": 15,
+}
+
+chat_model = ChatModel.from_pretrained("chat-bison@001")
 
 
 def generate_tests(prompts: dict) -> dict:
 
-    chat_model = ChatModel.from_pretrained("chat-bison@001")
-
-    parameters = {
-        # Temperature controls the degree of randomness in token selection.
-        "temperature": .8,
-        # Token limit determines the maximum amount of text output.
-        "max_output_tokens": 1024,
-        # Tokens are selected from most probable to least until the sum of their probabilities equals the top_p value.
-        "top_p": 0.4,
-        # A top_k of 1 means the selected token is the most probable among all tokens.
-        "top_k": 15,
-    }
     final_results = {}
     for path, prompt_list in prompts.items():
         results = []
@@ -64,27 +60,30 @@ def generate_tests(prompts: dict) -> dict:
         logging.info(
             f'Finished generating test(s) for {str(Path(path).relative_to(Path("./target_repository/").absolute()))}')
 
-        res = ''
-        path = path.replace('main', 'test')
-        path = Path(path)
-        test_path = path.with_name(name).with_suffix('.java')
+    return final_results
 
-        if len(results) > 1:
-            logging.info(
-                f'Multiple tests found for {str(Path(test_path).relative_to(Path("./target_repository/").absolute()))}, combining into 1 test file')
 
-            try:
-                res = combine_tests(chat_model, results, parameters)
-            except Exception as e:
-                logging.error(f'Failed combining tests: {e}')
-                continue
+def prepare_final_results(name: str, results: list[str], final_results: dict):
+    res = ''
+    path = path.replace('main', 'test')
+    path = Path(path)
+    test_path = path.with_name(name).with_suffix('.java')
 
-            final_results[test_path] = res
-        elif results:
+    if len(results) > 1:
+        logging.info(
+            f'Multiple tests found for {str(Path(test_path).relative_to(Path("./target_repository/").absolute()))}, combining into 1 test file')
 
-            res = results[0]
-            final_results[test_path] = results[0]
+        try:
+            res = combine_tests(chat_model, results, parameters)
+        except Exception as e:
+            logging.error(f'Failed combining tests: {e}')
+            raise BaseException('')
 
+        final_results[test_path] = res
+    elif results:
+
+        res = results[0]
+        final_results[test_path] = results[0]
     return final_results
 
 

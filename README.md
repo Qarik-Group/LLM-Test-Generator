@@ -1,5 +1,12 @@
 # LLM-Test-Generator
-Proof of concept: Can a Large Language Model Generate Unit tests
+
+## Goal
+Testing code thoroughly requires substantial time and effort. Companies with limited resources often struggle to create high-quality tests, resulting in issues in the production environment.
+This proof of concept was made to see if we can use a Large Language Model to generate unit tests for arbitrary source code.
+This POC focuses on java unit tests.
+
+:warning: Please be aware, at this point, this has produced results that are reasonably close to quality tests, but still needs manual intervention. :warning:
+
 
 ## Setup
 Tools:
@@ -21,3 +28,5 @@ Optional - use `--module=<module_path>` (relative to the target repository root)
 The generated tests can be found in the test folders of their corresponding modules in the target repository. They will be named `<Source File Name>GenTest.java`
 You can find the final prompts for each of the methods in `final_prompts` once they have been prepared
 You may need to make manual edits, but it is still faster than writing the tests from scratch
+
+
