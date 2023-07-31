@@ -34,6 +34,14 @@ chat_model = ChatModel.from_pretrained("chat-bison@001")
 
 
 def generate_tests(prompts: dict) -> dict:
+    """Generate the tests using the LLM
+
+    Args:
+        prompts (dict): All of the prompts we have created in previous steps
+
+    Returns:
+        dict: key: path value: test file contents
+    """
 
     final_results = {}
     for path, prompt_list in prompts.items():

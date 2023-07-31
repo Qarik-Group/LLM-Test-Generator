@@ -120,7 +120,13 @@ def gather_template_values(package: Package, code_file: CodeFile, method: Method
     return template_data
 
 
-def create_reference_context(package, template_data):
+def create_reference_context(package: Package, template_data: dict):
+    """Setup reference context, all other code in the same package as method that is having tests generated
+
+    Args:
+        package (Package): all the information for the package that tests are being generated for
+        template_data (_type_): template to fill in
+    """
     for source_code in package.source_code.values():
         info = {}
         for clas in source_code.class_signatures:
@@ -205,7 +211,13 @@ def populate_template(template_data: dict, prompt_val: int) -> dict:
         return {'question': data['question'], 'context': json_data}
 
 
-def format_nested_dictionary(template_dict, value_dict):
+def format_nested_dictionary(template_dict: dict, value_dict: dict) -> None:
+    """Format nested dictionary for prompt
+
+    Args:
+        template_dict (dict): The template to fill in
+        value_dict (dict): the values to fill the template in with
+    """
     for key, value in template_dict.items():
         if isinstance(value, dict):
             # Recursive call for nested dictionaries

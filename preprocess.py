@@ -256,7 +256,7 @@ def parse_methods(code: str, class_signatures: list[dict]) -> list[Method]:
 
     matches = re.findall(method_signature_pattern, code)
     for signature in matches:
-        body = get_next_method(code, code.index(
+        body = get_next_method_body(code, code.index(
             signature)+len(signature))
         if body == "":
             continue
@@ -396,6 +396,15 @@ def get_comment_before(code: str, index: int) -> str:
 
 
 def find_opening_bracket(code: str, starting_index: int) -> int:
+    """Find the next opening bracket - iterates forward from the starting index until '{' is found
+
+    Args:
+        code (str): the code that is being iterated through
+        starting_index (int): we we start the iteration
+
+    Returns:
+        int: index of where we are starting the search
+    """
     found = starting_index
     for c in code[starting_index:]:
         found += 1
@@ -404,15 +413,15 @@ def find_opening_bracket(code: str, starting_index: int) -> int:
     return starting_index
 
 
-def get_next_method(code: str, index: int) -> str:
-    """Retrieves the next method, starting at the index given
+def get_next_method_body(code: str, index: int) -> str:
+    """Retrieves the next method body, starting at the index given
 
     Args:
         code (str): the full text of a java document
         index (int): index of where to start looking for the next method
 
     Returns:
-        str: _description_
+        str: The content of the method body
     """
     index = find_opening_bracket(code, index)
     if code[index] != "{":
