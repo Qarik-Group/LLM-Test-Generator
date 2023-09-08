@@ -21,7 +21,15 @@ TARGET_DIRECTORY = 'target_repository'
 configure_logging()
 
 
-def clone_or_update_repository(repo_url) -> Path:
+def clone_or_update_repository(repo_url: str) -> Path:
+    """Clone/update the git repository you added to the command
+
+    Args:
+        repo_url (str): URL to the git repo
+
+    Returns:
+        Path: Path to the repository that was cloned/updated
+    """
     repo_name = repo_url.split('/')[-1].replace('.git', '')
     repo_path = os.path.join(TARGET_DIRECTORY, repo_name)
     logging.info(f'Preparing to clone {repo_url}')

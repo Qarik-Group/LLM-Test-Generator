@@ -34,6 +34,14 @@ chat_model = ChatModel.from_pretrained("chat-bison@001")
 
 
 def generate_tests(prompts: dict) -> dict:
+    """Generate the tests using the LLM
+
+    Args:
+        prompts (dict): All of the prompts we have created in previous steps
+
+    Returns:
+        dict: key: path value: test file contents
+    """
 
     final_results = {}
     for path, prompt_list in prompts.items():
@@ -59,11 +67,11 @@ def generate_tests(prompts: dict) -> dict:
             results.append(response.text)
         logging.info(
             f'Finished generating test(s) for {str(Path(path).relative_to(Path("./target_repository/").absolute()))}')
-        prepare_final_results(name, results, final_results)
+        prepare_final_results(name, path, results, final_results)
     return final_results
 
 
-def prepare_final_results(name: str, results: list[str], final_results: dict) -> dict:
+def prepare_final_results(name: str, path: str, results: list[str], final_results: dict) -> dict:
     """Combine results into one file, and make the path the correct place
 
     Args:
@@ -79,7 +87,9 @@ def prepare_final_results(name: str, results: list[str], final_results: dict) ->
     """
     res = ''
     path = path.replace('main', 'test')
+
     path = Path(path)
+
     test_path = path.with_name(name).with_suffix('.java')
 
     if len(results) > 1:
@@ -87,7 +97,7 @@ def prepare_final_results(name: str, results: list[str], final_results: dict) ->
             f'Multiple tests found for {str(Path(test_path).relative_to(Path("./target_repository/").absolute()))}, combining into 1 test file')
 
         try:
-            res = combine_tests(chat_model, results, parameters)
+            res = combine_tests(results)
         except Exception as e:
             logging.error(f'Failed combining tests: {e}')
             raise e

@@ -128,6 +128,14 @@ def start_sonarqube():
     subprocess.Popen(["sonar.sh", "console"], stdout=subprocess.DEVNULL)
     # Sleeps until the server has started.
     for x in range(0, 40, 10):
+        process = subprocess.Popen(
+            ['sonar.sh', 'status'], stdout=subprocess.PIPE)
+        output = process.stdout.read()
+
+        output = output.decode('utf-8')
+        if 'SonarQube is running' in output:
+            break
+
         logging.info('Waiting for sonarqube to start')
         time.sleep(10)
     logging.info('Sonarqube Server Started')
